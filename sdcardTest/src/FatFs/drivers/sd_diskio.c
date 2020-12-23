@@ -206,9 +206,9 @@ DRESULT SD_write(BYTE lun, const BYTE *buff, DWORD sector, UINT count)
                         count, SD_TIMEOUT) == MSD_OK)
   {
 	/* wait until the Write operation is finished */
-    // while(BSP_SD_GetCardState() != MSD_OK)
-    // {
-    // }
+    while(BSP_SD_GetCardState() != MSD_OK)
+    {
+    }
     res = RES_OK;
   }
 #else /* STM32L1xx */
