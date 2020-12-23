@@ -1,9 +1,8 @@
 #ifndef SD_H
 #define SD_H
-
+#include "globals.h"
 #ifdef SD_CARD_LOGGER_ENABLED
 #include SD_CARD_LIB_H
-#include "globals.h"
 
 #define SD_STATUS_OFF               0
 #define SD_STATUS_FS_READY          1

@@ -1,5 +1,5 @@
 // #include <logFile.h>
-#define SD_CARD_LIB_H <STM32SD.h>
+#define SD_CARD_LIB_H <src/STM32SD/STM32SD.h>
 #include "SD_logger.h"
 #include "SPI.h"
 #include "globals.h"
