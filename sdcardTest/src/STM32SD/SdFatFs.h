@@ -40,7 +40,7 @@
 #include "Sd2Card.h"
 
 /* FatFs includes component */
-#include "FatFs.h"
+#include "src/FatFs/FatFs.h"
 
 /* To match Arduino definition*/
 #define   FILE_WRITE  FA_WRITE
