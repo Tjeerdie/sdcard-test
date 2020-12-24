@@ -120,7 +120,7 @@ void SDwriteLogEntry()
             Bufferswritten ++; 
             memcpy(LogBufferCSV, &LogBufferCSV[bytes_written], bytes_written);
             bufferIndex -= bytes_written;
-            if (Bufferswritten>32)
+            if (Bufferswritten>256)
             {
                 // logFile.flush();
                 Bufferswritten = 0;

@@ -8,7 +8,8 @@
 		"files.associations": {
 			"*.tcc": "cpp",
 			"fstream": "cpp",
-			"ostream": "cpp"
+			"ostream": "cpp",
+			"functional": "c"
 		}
 	}
 }
