@@ -163,19 +163,19 @@ DRESULT SD_read(BYTE lun, BYTE *buff, DWORD sector, UINT count)
 #ifndef STM32L1xx
   DRESULT res = RES_ERROR;
 /* wait until the Write operation is finished */
-  uint8_t result = BSP_SD_GetCardState();
-  while(result != MSD_OK)
-  {
-    result = BSP_SD_GetCardState();
-  }
+  // uint8_t result = BSP_SD_GetCardState();
+  // while(result != MSD_OK)
+  // {
+  //   result = BSP_SD_GetCardState();
+  // }
   if(BSP_SD_ReadBlocks((uint32_t*)buff,
                        (uint32_t) (sector),
                        count, SD_TIMEOUT) == MSD_OK)
   {
-    // /* wait until the read operation is finished */
-    // while(BSP_SD_GetCardState()!= MSD_OK)
-    // {
-    // }
+    /* wait until the read operation is finished */
+    while(BSP_SD_GetCardState()!= MSD_OK)
+    {
+    }
     res = RES_OK;
   }
 #else /* STM32L1xx */
@@ -205,16 +205,19 @@ DRESULT SD_write(BYTE lun, const BYTE *buff, DWORD sector, UINT count)
 {
 #ifndef STM32L1xx
 DRESULT res = RES_ERROR;
-/* wait until the Write operation is finished */
-  uint8_t result = BSP_SD_GetCardState();
-  while(result != MSD_OK)
-  {
-    result = BSP_SD_GetCardState();
-  }
-  if(BSP_SD_WriteBlocks((uint32_t*)buff,
+
+  if(BSP_SD_WriteBlocks_DMA((uint32_t*)buff,
                         (uint32_t)(sector),
-                        count, SD_TIMEOUT) == MSD_OK)
+                        count) == MSD_OK)
+                        //count, SD_TIMEOUT) == MSD_OK)
+
   {
+    /* wait until the Write operation is finished */
+    uint8_t result = BSP_SD_GetCardState();
+    while(result != MSD_OK)
+    {
+      result = BSP_SD_GetCardState();
+    }
     res = RES_OK;
   }
 

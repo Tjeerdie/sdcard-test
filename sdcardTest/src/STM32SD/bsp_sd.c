@@ -119,6 +119,11 @@ static GPIO_TypeDef *SD_trans_sel_gpio_port = GPIOA;
 static SD_CardInfo uSdCardInfo;
 #endif
 
+/* Private function prototypes -----------------------------------------------*/
+// static void              BSP_SD_MspInit(void);
+// static void              BSP_SD_MspDeInit(void);
+static HAL_StatusTypeDef SD_DMAConfigRx(SD_HandleTypeDef* hsd);
+static HAL_StatusTypeDef SD_DMAConfigTx(SD_HandleTypeDef* hsd);
 
 /**
   * @brief  Initializes the SD card device with CS check if any.
@@ -557,4 +562,114 @@ void BSP_SD_GetCardInfo(HAL_SD_CardInfoTypeDef *CardInfo)
   HAL_SD_Get_CardInfo(&uSdHandle, CardInfo);
 }
 
+
+/**
+ * @brief  Writes block(s) to a specified address in an SD card, in DMA mode.
+ * @param  pData: Pointer to the buffer that will contain the data to transmit
+ * @param  WriteAddr: Address from where data is to be written
+ * @param  NumOfBlocks: Number of SD blocks to write
+ * @retval SD status
+ */
+uint8_t BSP_SD_WriteBlocks_DMA(uint32_t* pData,
+                               uint32_t  WriteAddr,
+                               uint32_t  NumOfBlocks)
+{
+    HAL_StatusTypeDef sd_state = HAL_OK;
+
+    /* Invalidate the dma rx handle*/
+    uSdHandle.hdmarx = NULL;
+
+    /* Prepare the dma channel for a read operation */
+    sd_state = SD_DMAConfigTx(&uSdHandle);
+
+    if(sd_state == HAL_OK)
+    {
+        /* Write block(s) in DMA transfer mode */
+        sd_state = HAL_SD_WriteBlocks_DMA(&uSdHandle, (uint8_t*)pData, WriteAddr,
+                                          NumOfBlocks);
+    }
+
+    return (sd_state == HAL_OK) ? MSD_OK : MSD_ERROR;
+ }
+
+//  /**
+//  * @brief Configure the DMA to receive data from the SD card
+//  * @retval
+//  *  HAL_ERROR or HAL_OK
+//  */
+// static HAL_StatusTypeDef SD_DMAConfigRx(SD_HandleTypeDef* hsd)
+// {
+//     static DMA_HandleTypeDef hdma_rx;
+//     HAL_StatusTypeDef        status = HAL_ERROR;
+
+//     /* Configure DMA Rx parameters */
+//     hdma_rx.Instance                 = DMA2_Channel5;
+//     hdma_rx.Init.Request             = DMA_REQUEST_7;
+//     hdma_rx.Init.Direction           = DMA_PERIPH_TO_MEMORY;
+//     hdma_rx.Init.PeriphInc           = DMA_PINC_DISABLE;
+//     hdma_rx.Init.MemInc              = DMA_MINC_ENABLE;
+//     hdma_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+//     hdma_rx.Init.MemDataAlignment    = DMA_MDATAALIGN_WORD;
+//     hdma_rx.Init.Priority            = DMA_PRIORITY_VERY_HIGH;
+
+//     /* Associate the DMA handle */
+//     __HAL_LINKDMA(hsd, hdmarx, hdma_rx);
+
+//     /* Stop any ongoing transfer and reset the state */
+//     HAL_DMA_Abort(&hdma_rx);
+
+//     /* Deinitialize the Channel for new transfer */
+//     HAL_DMA_DeInit(&hdma_rx);
+
+//     /* Configure the DMA Channel */
+//     status = HAL_DMA_Init(&hdma_rx);
+
+//     /* NVIC configuration for DMA transfer complete interrupt */
+//     HAL_NVIC_SetPriority(DMA2_Channel5_IRQn, SD_DMA_IRQ_PRIO, 0);
+//     HAL_NVIC_EnableIRQ(DMA2_Channel5_IRQn);
+
+//     return status;
+// }
+
+/**
+ * @brief Configure the DMA to transmit data to the SD card
+ * @retval
+ *  HAL_ERROR or HAL_OK
+ */
+static HAL_StatusTypeDef SD_DMAConfigTx(SD_HandleTypeDef* hsd)
+{
+    static DMA_HandleTypeDef hdma_tx;
+    HAL_StatusTypeDef        status;
+
+    /* Configure DMA Tx parameters */
+    hdma_tx.Instance                 = DMA2_Stream3;
+    hdma_tx.Init.Channel             = DMA_CHANNEL_4;
+    hdma_tx.Init.Direction           = DMA_MEMORY_TO_PERIPH;
+    hdma_tx.Init.PeriphInc           = DMA_PINC_DISABLE;
+    hdma_tx.Init.MemInc              = DMA_MINC_ENABLE;
+    hdma_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+    hdma_tx.Init.MemDataAlignment    = DMA_MDATAALIGN_WORD;
+    hdma_tx.Init.Priority            = DMA_PRIORITY_VERY_HIGH;
+
+
+    __HAL_RCC_DMA2_CLK_ENABLE();
+
+    /* Associate the DMA handle */
+    __HAL_LINKDMA(hsd, hdmatx, hdma_tx);
+
+    /* Stop any ongoing transfer and reset the state */
+    HAL_DMA_Abort(&hdma_tx);
+
+    /* Deinitialize the Channel for new transfer */
+    HAL_DMA_DeInit(&hdma_tx);
+
+    /* Configure the DMA Channel */
+    status = HAL_DMA_Init(&hdma_tx);
+
+    /* NVIC configuration for DMA transfer complete interrupt */
+    HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
+
+    return status;
+}
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
