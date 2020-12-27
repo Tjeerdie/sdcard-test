@@ -353,7 +353,7 @@ uint8_t BSP_SD_ReadBlocks(uint32_t *pData, uint32_t ReadAddr, uint32_t NumOfBloc
   */
 uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint32_t WriteAddr, uint32_t NumOfBlocks, uint32_t Timeout)
 {
-  if (HAL_SD_WriteBlocks_DMA(&uSdHandle, (uint8_t *)pData, WriteAddr, NumOfBlocks) != HAL_OK) {
+  if (HAL_SD_WriteBlocks(&uSdHandle, (uint8_t *)pData, WriteAddr, NumOfBlocks, Timeout) != HAL_OK) {
     return MSD_ERROR;
   } else {
     return MSD_OK;
@@ -572,9 +572,13 @@ void BSP_SD_GetCardInfo(HAL_SD_CardInfoTypeDef *CardInfo)
  */
 uint8_t BSP_SD_WriteBlocks_DMA(uint32_t* pData,
                                uint32_t  WriteAddr,
-                               uint32_t  NumOfBlocks)
+                               uint32_t  NumOfBlocks,
+                               uint32_t Timeout)
 {
     HAL_StatusTypeDef sd_state = HAL_OK;
+    HAL_StatusTypeDef sd_state_while_loop = HAL_OK;
+    HAL_SD_CardStateTypeDef card_state;
+    uint32_t loopnr = 0;
 
     /* Invalidate the dma rx handle*/
     uSdHandle.hdmarx = NULL;
@@ -588,8 +592,25 @@ uint8_t BSP_SD_WriteBlocks_DMA(uint32_t* pData,
         sd_state = HAL_SD_WriteBlocks_DMA(&uSdHandle, (uint8_t*)pData, WriteAddr,
                                           NumOfBlocks);
     }
+  // busy waiting
+  // do
+  // {
+  //   sd_state_while_loop = HAL_SD_GetState(&uSdHandle);
+  // } while ((HAL_SD_STATE_BUSY == sd_state_while_loop));
+  // if (HAL_SD_STATE_READY != sd_state_while_loop) { return MSD_ERROR; }
 
-    return (sd_state == HAL_OK) ? MSD_OK : MSD_ERROR;
+  do
+  {
+    loopnr++;
+  } while ((loopnr <100000));
+  // busy waiting
+  do
+  {
+    card_state = HAL_SD_GetCardState(&uSdHandle);
+    loopnr--;
+  } while ((HAL_SD_CARD_TRANSFER != card_state));
+  return MSD_OK;
+   return (sd_state_while_loop == HAL_OK) ? MSD_OK : MSD_ERROR;
  }
 
 //  /**
@@ -650,6 +671,11 @@ static HAL_StatusTypeDef SD_DMAConfigTx(SD_HandleTypeDef* hsd)
     hdma_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
     hdma_tx.Init.MemDataAlignment    = DMA_MDATAALIGN_WORD;
     hdma_tx.Init.Priority            = DMA_PRIORITY_VERY_HIGH;
+    // hdma_tx.Init.Mode                = DMA_PFCTRL;
+    hdma_tx.Init.FIFOMode            = DMA_FIFOMODE_ENABLE;
+    hdma_tx.Init.FIFOThreshold       = DMA_FIFO_THRESHOLD_FULL;
+    hdma_tx.Init.MemBurst            = DMA_MBURST_INC4;
+    hdma_tx.Init.PeriphBurst         = DMA_MBURST_INC4;
 
 
     __HAL_RCC_DMA2_CLK_ENABLE();
@@ -667,7 +693,7 @@ static HAL_StatusTypeDef SD_DMAConfigTx(SD_HandleTypeDef* hsd)
     status = HAL_DMA_Init(&hdma_tx);
 
     /* NVIC configuration for DMA transfer complete interrupt */
-    HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
 
     return status;
