@@ -9,8 +9,8 @@
 #define SD_STATUS_CARD_READY        2
 #define SD_STATUS_LOGGING           4
 #define SD_STATUS_ERROR_NO_WRITE    8
-#define WRITE_BUFFER_SIZE           16384
-#define WRITE_TRIGGER_BYTES         512 //when to write to sdcard. minmum is 512 bytes, and always must be multiple of 512 bytes for efficiency 
+#define WRITE_BUFFER_SIZE           16384U
+#define WRITE_TRIGGER_BYTES         512U //when to write to sdcard. minmum is 512 bytes, and always must be multiple of 512 bytes for efficiency 
 
 
 #ifdef CORE_TEENSY

@@ -87,25 +87,26 @@ void SDcloseLogFile()
 
 void SDwriteLogEntry()
 {
-    uint16_t bytes_written;
+    uint16_t bytes_written = 0;
     uint32_t microstart = micros();
+    currentStatus.TPS = BSP_SD_GetCardState();
     //only run logger if file is acutally open.
-    if((currentStatus.sd_status & SD_STATUS_FS_READY) &  (BSP_SD_GetCardState()==0))
+    if(currentStatus.sd_status & SD_STATUS_FS_READY)
     {
 
       
     //   updateLogdataBIN();
     //   bytes_written = logFile.write(LogBufferBIN, sizeof(LogBufferBIN));
-      
-      updateLogdataCSV();
+    currentStatus.MAP = millis();      
+    currentStatus.PW2 = bufferIndex;
+    updateLogdataCSV();
     //   Serial.printf("updateLogdataCSV took: %02d\n", (micros()-microstart));
 
     //write debugging time to sdcard to see at what point it fails (NOT used in speeduino firmware testing)
-    currentStatus.MAP = millis();
-      if (bufferIndex > WRITE_TRIGGER_BYTES){
+      if ((bufferIndex > WRITE_TRIGGER_BYTES)){
             // logFile = SD.open(filename, FILE_WRITE);  
             // logFile.seek(logFile.size());
-
+            // Serial.println(bufferIndex);
             //if buffer is filling up stop logging
             if (bufferIndex >= WRITE_BUFFER_SIZE-128){
                 currentStatus.sd_status = SD_STATUS_ERROR_NO_WRITE;
@@ -113,24 +114,30 @@ void SDwriteLogEntry()
                 //Need to close the file else all data is lossed. 
                 //closing at this point will lock up the board because comms with sdcard are broken
                 SDcloseLogFile();
+                Serial.write(LogBufferCSV, WRITE_BUFFER_SIZE);
                 
             }
-            bytes_written = logFile.write(LogBufferCSV, WRITE_TRIGGER_BYTES); 
-            Total_bytes_written += bytes_written;
-            Bufferswritten ++; 
-            memcpy(LogBufferCSV, &LogBufferCSV[bytes_written], bytes_written);
-            bufferIndex -= bytes_written;
-            if (Bufferswritten>256)
-            {
-                // logFile.flush();
-                Bufferswritten = 0;
+            
+            if (currentStatus.TPS==0){
+                bytes_written = logFile.write(&LogBufferCSV[0], WRITE_TRIGGER_BYTES); 
+                bufferIndex -= bytes_written;
+                Total_bytes_written += bytes_written;
+                memcpy(&LogBufferCSV, &LogBufferCSV[bytes_written], bufferIndex);
+                Bufferswritten ++; 
             }
 
-            if (512!=bytes_written)
-            {
-                // logFile.flush();
-                Bufferswritten = 0;
-            }
+                        
+            // if (Bufferswritten>256)
+            // {
+            //     // logFile.flush();
+            //     Bufferswritten = 0;
+            // }
+
+            // if (512!=bytes_written)
+            // {
+            //     // logFile.flush();
+            //     Bufferswritten = 0;
+            // }
             
             // logFile.close();
 
@@ -140,8 +147,6 @@ void SDwriteLogEntry()
             // Serial.println(LogBufferCSV);    
 
             //write debugging info to sdcard to see at what point it fails (NOT used in speeduino firmware testing)
-            currentStatus.RPM = bytes_written;
-            currentStatus.PW1 = Total_bytes_written;
             // Serial.printf("write log entry: %02d\n",bytes_written);   
             // Serial.printf("SDwrite: %02d uS\n", (micros()-microstart));     
       }
@@ -150,14 +155,16 @@ void SDwriteLogEntry()
       
       //write debugging info to sdcard to see at what point it fails (NOT used in speeduino firmware testing)
       currentStatus.dwell = micros()-microstart;
-
+      currentStatus.RPM = bytes_written;
+      currentStatus.PW1 = Total_bytes_written;
+            
     }
 
 }
 void updateCSVField()
 {
     uint16_t length = strlen(LogBufferCSVfield);
-    memcpy(&LogBufferCSV[bufferIndex], LogBufferCSVfield, length);
+    memcpy(&LogBufferCSV[bufferIndex], &LogBufferCSVfield, length);
     bufferIndex += length;
     LogBufferCSV[bufferIndex] = ';';
     bufferIndex += 1;
