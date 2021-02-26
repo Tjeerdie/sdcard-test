@@ -8,10 +8,7 @@ uint8_t RandomBuffer[8192];
 
 #define RTC_ENABLED
 
-#ifdef STM32F407xx
-  #define SD_LOGGING //SD logging enabled for STM32F407 because it has the SDIO interface
-  #define SD_LIB_H "src/STM32SD/STM32SD.h"
-#endif
+
 
 void setup()
 {
@@ -27,10 +24,14 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT); 
   digitalWrite(LED_BUILTIN, LOW);
   
-  SDinit();
-  SDopenLogFile();
-  Serial.print("sd_status=");
-  Serial.println(currentStatus.sd_status);
+  configPage13.onboard_log_csv_separator=1;
+  configPage13.onboard_log_file_style=1;
+  configPage13.onboard_log_filenaming=1;
+
+  logger_init();
+  logger_openLogFile();
+  Serial.print("TS_SD_Status=");
+  Serial.println(currentStatus.TS_SD_Status);
   Serial.println("Setup done. if Status=8 then error");
 }
 
@@ -39,7 +40,7 @@ void loop()
   uint32_t starttime = millis();
 
   digitalWrite(LED_BUILTIN, LOW);
-  SDwriteLogEntry();
+  logger_writeLogEntry();
   digitalWrite(LED_BUILTIN, HIGH);
 
   //Put some random data in de currentStatus so the logger is doing something
@@ -56,9 +57,9 @@ void loop()
       switch(Serial.read())
       {
       case 'O':
-        SDopenLogFile();
-        Serial.print("sd_status=");
-        Serial.println(currentStatus.sd_status);
+        logger_openLogFile();
+        Serial.print("TS_SD_Status=");
+        Serial.println(currentStatus.TS_SD_Status);
         Serial.println("Log file opend");
         break;   
       case 'W':
@@ -66,9 +67,9 @@ void loop()
         }
         break;
       case 'C':
-        SDcloseLogFile();
-        Serial.print("sd_status=");
-        Serial.println(currentStatus.sd_status);
+        logger_openLogFile();
+        Serial.print("TS_SD_Status=");
+        Serial.println(currentStatus.TS_SD_Status);
         Serial.println("Log file closed");
         break;     
       } 

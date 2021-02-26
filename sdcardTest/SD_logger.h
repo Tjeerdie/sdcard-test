@@ -1,6 +1,7 @@
 #ifndef SD_H
 #define SD_H
 #include "globals.h"
+// #include "comms.h" //Neede for binairy logging
 #ifdef SD_LOGGING
 #include SD_LIB_H
 
@@ -9,40 +10,40 @@
 #define SD_STATUS_CARD_READY        2
 #define SD_STATUS_LOGGING           4
 #define SD_STATUS_ERROR_NO_WRITE    8
-#define WRITE_BUFFER_SIZE           16384U
-#define WRITE_TRIGGER_BYTES         2048U //when to write to sdcard. minmum is 512 bytes, and always must be integer multiple of 512 bytes for efficiency 
 
+#define SD_LOGGER_BUFFER_SIZE       16384U
+#define SD_LOGGER_WRITE_TRIG        512U    //Must always must be integer multiple of 512 bytes  (sd card write blocks)
+#define SD_LOGGER_CLOSE_FILE_TOUT   300     //Timeout on closing file of 300 milliseconds 
+#define SD_LOGGER_FLUSH_FILE_TRIG   30      //After how many chuncks of data a flush of the file is executed. 
 
 #ifdef CORE_TEENSY
     #define SD_CS_PIN BUILTIN_SDCARD
-#elif STM32F4
+#elif STM32F407xx
     #define SD_CS_PIN SD_DETECT_NONE
 #else
     #define SD_CS_PIN 10 //This is a made up value for now
 #endif
 
-//Sd2Card SD;
-//SdVolume SD_volume;
+//List of logger field names. This must be in the same order and length as logger_updateLogdataCSV()
+const char *ptr_fields[] = {"hasSync","RPM","MAP", "TPS", "tpsDOT","mapDOT","rpmDOT","VE1", "VE2","O2","O2_2"\
+                            ,"coolant","IAT","dwell","battery10","advance","advance1","advance2","corrections",\
+                            "AEamount","egoCorrection","wueCorrection","batCorrection","iatCorrection","baroCorrection",\
+                            "launchCorrection","flexCorrection","fuelTempCorrection","flexIgnCorrection","afrTarget",\
+                            "idleDuty","CLIdleTarget","idleUpActive","CTPSActive","fanOn","ethanolPct","fuelTemp",\
+                            "AEEndTime","status1","spark","spark2","engine","PW1","PW2","PW3","PW4","PW5","PW6","PW7"\
+                            ,"PW8","runSecs","secl","loopsPerSecond","launchingSoft","launchingHard","freeRAM",\
+                            "startRevolutions","boostTarget","testOutputs","testActive","boostDuty","idleLoad",\
+                            "status3","flexBoostCorrection","nitrous_status","fuelLoad","fuelLoad2","ignLoad",\
+                            "fuelPumpOn","syncLossCounter","knockRetard","knockActive","toothLogEnabled",\
+                            "compositeLogEnabled","vvt1Angle","vvt1Angle","vvt1TargetAngle","vvt1Duty",\
+                            "injAngle","ASEValue","vss","idleUpOutputActive","gear","fuelPressure","oilPressure"\
+                            ,"engineProtectStatus","wmiPW", NULL};
 
-File logFile;
-uint8_t LogBufferBIN[128]; 
-char LogBufferCSV[WRITE_BUFFER_SIZE]; 
-char LogBufferCSVfield[32];
-char filename[32];
-uint16_t bufferIndex;
-uint16_t Bufferswritten;
-uint32_t Total_bytes_written;
-bool FlushFile;
-
-void updateLogdataBIN();
-void SDinit();
-void SDopenLogFile();
-void SDcloseLogFile();
-void SDwriteLogEntry();
-void updateLogdataCSV();
-
-
-
+extern "C" {uint32_t get_fattime (void);}
+void logger_init();
+void logger_openLogFile();
+void logger_closeLogFile();
+void logger_writeLogEntry();
 
 #endif //SD_LOGGING
 #endif //SD_H

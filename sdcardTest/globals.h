@@ -2,7 +2,28 @@
 #define GLOBALS_H
 #include <Arduino.h>
 
-#define SD_LOGGING
+#ifdef STM32F407xx
+  #define SD_LOGGING //SD logging enabled for STM32F407 because it has the SDIO interface
+  #define SD_LIB_H "src/STM32SD/STM32SD.h"
+#endif
+
+#define LOGGER_CSV_SEPARATOR_SEMICOLON  0
+#define LOGGER_CSV_SEPARATOR_COMMA      1
+#define LOGGER_CSV_SEPARATOR_TAP        2
+#define LOGGER_CSV_SEPARATOR_SPACE      3
+
+#define LOGGER_DISABLED                 0
+#define LOGGER_CSV                      1
+#define LOGGER_BINARY                   2
+
+#define LOGGER_RATE_1HZ                 0
+#define LOGGER_RATE_4HZ                 1
+#define LOGGER_RATE_10HZ                2
+#define LOGGER_RATE_30HZ                3
+
+#define LOGGER_FILENAMING_OVERWRITE     0
+#define LOGGER_FILENAMING_DATETIME      1
+#define LOGGER_FILENAMING_SEQENTIAL     2
 
 
 //The status struct contains the current values for all 'live' variables
@@ -122,11 +143,62 @@ struct statuses {
   byte vvt2TargetAngle;
   byte vvt2Duty;
   byte outputsStatus;
-  byte sd_status;
+  byte TS_SD_Status; //TunerStudios SD card status
 };
+
+/*
+Page 13 - Programmable outputs conditions.
+128 bytes long
+*/
+struct config13 {
+  uint8_t outputInverted;
+  uint8_t unused12_1;
+  uint8_t outputPin[8];
+  uint8_t outputDelay[8]; //0.1S
+  uint8_t firstDataIn[8];
+  uint8_t secondDataIn[8];
+  uint8_t unused_13[16];
+  int16_t firstTarget[8];
+  int16_t secondTarget[8];
+  //89bytes
+  byte operation[89];
+
+  uint16_t candID[8]; //Actual CAN ID need 16bits, this is a placeholder
+
+  byte unused12_106_116[10];
+
+  byte onboard_log_csv_separator :2;  //";", ",", "tab", "space"  
+  byte onboard_log_file_style    :2;  // "Disabled", "CSV", "Binary", "INVALID" 
+  byte onboard_log_file_rate     :2;  // "1Hz", "4Hz", "10Hz", "30Hz" 
+  byte onboard_log_filenaming    :2;  // "Overwrite", "Date-time", "Sequential", "INVALID" 
+  byte onboard_log_storage       :2;  // "sd-card", "INVALID", "INVALID", "INVALID" ;In the future maybe an onboard spi flash can be used, or switch between SDIO vs SPI sd card interfaces.
+  byte onboard_log_trigger_boot  :1;  // "Disabled", "On boot"
+  byte onboard_log_trigger_RPM   :1;  // "Disabled", "Enabled"
+  byte onboard_log_trigger_prot  :1;  // "Disabled", "Enabled"
+  byte onboard_log_trigger_Vbat  :1;  // "Disabled", "Enabled"
+  byte onboard_log_trigger_Epin  :2;  // "Disabled", "polling", "toggle" , "INVALID" 
+  byte onboard_log_tr2_thr_on;        //  "RPM",      100.0,  0.0,    0,     10000,  0
+  byte onboard_log_tr2_thr_off;       //  "RPM",      100.0,  0.0,    0,     10000,  0
+  byte onboard_log_tr3_thr_RPM   :1;  // "Disabled", "Enabled"
+  byte onboard_log_tr3_thr_MAP   :1;  // "Disabled", "Enabled"
+  byte onboard_log_tr3_thr_Oil   :1;  // "Disabled", "Enabled"
+  byte onboard_log_tr3_thr_AFR   :1;  // "Disabled", "Enabled"     
+  byte onboard_log_tr4_thr_on;        // "V",        0.1,   0.0,  0.0,  15.90,      2 ; * (  1 byte)    
+  byte onboard_log_tr4_thr_off;       // "V",        0.1,   0.0,  0.0,  15.90,      2 ; * (  1 byte)   
+  byte onboard_log_tr5_thr_on;        // "pin",      0,    0, 0,  1,    255,        0 ;  
+  
+
+  byte unused12_125_127[4];
+
+#if defined(CORE_AVR)
+  };
+#else
+  } __attribute__((__packed__)); //The 32 bit systems require all structs to be fully packed
+#endif
 
 
 extern struct statuses currentStatus; //The global status object
+extern struct config13 configPage13;
 
 /*
 ***********************************************************************************************************
