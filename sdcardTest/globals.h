@@ -2,7 +2,7 @@
 #define GLOBALS_H
 #include <Arduino.h>
 
-#define SD_CARD_LOGGER_ENABLED
+#define SD_LOGGING
 
 
 //The status struct contains the current values for all 'live' variables

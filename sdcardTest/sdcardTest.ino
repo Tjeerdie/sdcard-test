@@ -1,16 +1,22 @@
 // #include <logFile.h>
-#define SD_CARD_LIB_H <src/STM32SD/STM32SD.h>
 #include "SD_logger.h"
 #include "SPI.h"
 #include "globals.h"
 
 uint8_t RandomBuffer[8192]; 
-#define SD_CARD_LOGGER_ENABLED
+#define SD_LOGGING
+
+#define RTC_ENABLED
+
+#ifdef STM32F407xx
+  #define SD_LOGGING //SD logging enabled for STM32F407 because it has the SDIO interface
+  #define SD_LIB_H "src/STM32SD/STM32SD.h"
+#endif
 
 void setup()
 {
   Serial.begin(115200);
-  Serial1.begin(115200);
+  // Serial1.begin(115200);
 
   while (!Serial) {
     ; // wait for serial port to connect. Needed for native USB
@@ -41,8 +47,8 @@ void loop()
   currentStatus.spark += 3;
 
 
-  //do somthing else for until 10 milliseconds have passed.
-  while (millis()-starttime<10)
+  //do somthing else for until 30 milliseconds have passed.
+  while (millis()-starttime<30)
   {
     if(Serial.available() > 0)
     {

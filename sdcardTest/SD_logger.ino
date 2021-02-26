@@ -1,6 +1,6 @@
 
 #include "globals.h"
-#ifdef SD_CARD_LOGGER_ENABLED
+#ifdef SD_LOGGING
 #include "SD_logger.h"
 #include "Arduino.h"
 #include "src/STM32SD/bsp_sd.h"
@@ -12,23 +12,17 @@ void updateLogdataBIN()
 
 void SDinit()
 { 
-    int milistart = millis();
     currentStatus.sd_status = SD_STATUS_OFF; 
     //Init the connection to the card reader
     if (SD.begin(SD_CS_PIN)) 
     {
         currentStatus.sd_status |= SD_STATUS_CARD_READY;
     }   
-    else { currentStatus.sd_status |= SD_STATUS_ERROR_NO_WRITE; }
-
-    //Debug lines on serial port 1.
-    Serial.printf("initSD took: %02d\n", (millis()-milistart));
-    
+    else { currentStatus.sd_status |= SD_STATUS_ERROR_NO_WRITE; }   
 }
 
 void SDopenLogFile()
 {
-    int milistart = millis();
     //Attempt to create a log file for writing
     if(!(currentStatus.sd_status & SD_STATUS_FS_READY))
     {
@@ -50,8 +44,6 @@ void SDopenLogFile()
         // logFile.flush();
         // logFile.close();
 
-        //Debug timing to get a sense how long it takes
-        Serial.printf("openLogFile took: %02d\n", (millis()-milistart));
     }
 
 
@@ -63,96 +55,80 @@ void SDopenLogFile()
 //This creates orphan sectors on the card, and also a file of 0 kbyte size. 
 void SDcloseLogFile()
 {   
-    //Some debugging that can be used to see what is going on in speeduino 
-    // Serial.printf("rtc_mode: %02d\n",configPage13.rtc_mode);
-    // Serial.printf("rtc_trim: %02d\n",configPage13.rtc_trim);
-    // Serial.printf("sd_log_file_style: %02d\n",configPage13.sd_log_file_style);
-    // Serial.printf("sd_log_filenaming: %02d\n",configPage13.sd_log_filenaming);
-    // Serial.printf("sd_log_trigger_style: %02d\n",configPage13.sd_log_trigger_style);
-
-    //Timing measurenements
-    int microstart = micros();
+    //Only close if the sdcard is ready. else the file is not closed and data is lossed.
+     while(BSP_SD_GetCardState())
+     {    
+     };
 
     //write buffer to sdcard before closing
     logFile.write(LogBufferCSV, bufferIndex);  
     bufferIndex = 0;
+    
+    uint32_t microstart = micros();
     if(logFile){
         logFile.close();
         bufferIndex = 0;
     }
     currentStatus.sd_status &= ~SD_STATUS_FS_READY;
-    Serial.print("closing file takes us: ");
+    Serial.print("closedFile [us]: ");
     Serial.println(micros()-microstart);
 }
 
 void SDwriteLogEntry()
 {
-    uint16_t bytes_written = 0;
     uint32_t microstart = micros();
-    currentStatus.TPS = BSP_SD_GetCardState();
+    uint16_t bytes_written = 0;
+
     //only run logger if file is acutally open.
     if(currentStatus.sd_status & SD_STATUS_FS_READY)
     {
+        //Update all CSV fields for logging.
+        updateLogdataCSV();
 
-      
-    //   updateLogdataBIN();
-    //   bytes_written = logFile.write(LogBufferBIN, sizeof(LogBufferBIN));
-    currentStatus.MAP = millis();      
-    currentStatus.PW2 = bufferIndex;
-    updateLogdataCSV();
-    //   Serial.printf("updateLogdataCSV took: %02d\n", (micros()-microstart));
+        //write in chuncks of Interger*512 bytes to sdcard.
+        if ((bufferIndex > WRITE_TRIGGER_BYTES)){
 
-    //write debugging time to sdcard to see at what point it fails (NOT used in speeduino firmware testing)
-      if ((bufferIndex > WRITE_TRIGGER_BYTES)){
-            // logFile = SD.open(filename, FILE_WRITE);  
-            // logFile.seek(logFile.size());
-            // Serial.println(bufferIndex);
-            //if buffer is filling up stop logging
+            //if buffer is filling up to the maximum stop logging and set erro flag
             if (bufferIndex >= WRITE_BUFFER_SIZE-128){
                 currentStatus.sd_status = SD_STATUS_ERROR_NO_WRITE;
 
-                //Need to close the file else all data is lossed. 
-                //closing at this point will lock up the board because comms with sdcard are broken
+                //Try to close the file else all data is lossed. 
                 SDcloseLogFile();
-                Serial.write(LogBufferCSV, WRITE_BUFFER_SIZE);
                 
             }
-            
-            if (currentStatus.TPS==0){
-                bytes_written = logFile.write(&LogBufferCSV[0], WRITE_TRIGGER_BYTES); 
-                bufferIndex -= bytes_written;
-                Total_bytes_written += bytes_written;
-                memcpy(&LogBufferCSV, &LogBufferCSV[bytes_written], bufferIndex);
-                Bufferswritten ++; 
+
+            //Only try to write data to the sdcard when the card is ready.
+            if (BSP_SD_GetCardState()==0){
+                if (!FlushFile){
+                    bytes_written = logFile.write(&LogBufferCSV[0], WRITE_TRIGGER_BYTES); 
+                    bufferIndex -= bytes_written;
+                    Total_bytes_written += bytes_written;
+                    memcpy(&LogBufferCSV, &LogBufferCSV[bytes_written], bufferIndex);
+                    Bufferswritten++;
+                }else
+                {
+                    logFile.flush();
+                    FlushFile = false;
+                    // Serial.println("Re-opend file");
+                    // logFile = SD.open(filename, FILE_WRITE);
+                    // logFile.seek(logFile.size());
+                    // FlushFile = false;
+                }
+                
+
             }
 
                         
-            // if (Bufferswritten>256)
-            // {
-            //     // logFile.flush();
-            //     Bufferswritten = 0;
-            // }
-
-            // if (512!=bytes_written)
-            // {
-            //     // logFile.flush();
-            //     Bufferswritten = 0;
-            // }
-            
-            // logFile.close();
-
-            // Serial.print("index= ");
-            // Serial.println(bufferIndex);
-            // Serial.print("Buffer= ");
-            // Serial.println(LogBufferCSV);    
-
-            //write debugging info to sdcard to see at what point it fails (NOT used in speeduino firmware testing)
-            // Serial.printf("write log entry: %02d\n",bytes_written);   
-            // Serial.printf("SDwrite: %02d uS\n", (micros()-microstart));     
+            if (Bufferswritten>30)
+            {   //logFile.flush();
+                // logFile.close();
+                FlushFile = true;
+                Bufferswritten = 0;
+                // Serial.println("Flushed file");
+            }          
+   
       }
-
-    //   Serial.printf("SDwriteLogEntry took: %02d\n", (micros()-microstart));
-      
+     
       //write debugging info to sdcard to see at what point it fails (NOT used in speeduino firmware testing)
       currentStatus.dwell = micros()-microstart;
       currentStatus.RPM = bytes_written;
@@ -230,7 +206,6 @@ void updateLogdataCSV()
     itoa(currentStatus.launchingHard,LogBufferCSVfield,10);updateCSVField();
     itoa(currentStatus.freeRAM,LogBufferCSVfield,10);updateCSVField();
     itoa(currentStatus.startRevolutions,LogBufferCSVfield,10);updateCSVField();
-
     itoa(currentStatus.boostTarget,LogBufferCSVfield,10);updateCSVField();
     itoa(currentStatus.testOutputs,LogBufferCSVfield,10);updateCSVField();
     itoa(currentStatus.testActive,LogBufferCSVfield,10);updateCSVField();
@@ -261,16 +236,13 @@ void updateLogdataCSV()
     itoa(currentStatus.oilPressure,LogBufferCSVfield,10);updateCSVField();
     itoa(currentStatus.engineProtectStatus,LogBufferCSVfield,10);updateCSVField();
     itoa(currentStatus.wmiPW,LogBufferCSVfield,10);updateCSVField();
+    itoa(currentStatus.vvt2Angle,LogBufferCSVfield,10);updateCSVField();
+    itoa(currentStatus.vvt2TargetAngle,LogBufferCSVfield,10);updateCSVField();
+    itoa(currentStatus.vvt2Duty,LogBufferCSVfield,10);updateCSVField();
+    itoa(currentStatus.outputsStatus,LogBufferCSVfield,10);updateCSVField();
+    itoa(currentStatus.sd_status,LogBufferCSVfield,10);updateCSVField();
 
-
-
-
-//   long vvt2Angle;
-//   byte vvt2TargetAngle;
-//   byte vvt2Duty;
-//   byte outputsStatus;
-//   byte sd_status;
-   //close CSV line 
+   //close CSV line with end of line character
    LogBufferCSV[bufferIndex] = '\n';
    bufferIndex += 1;
 }

@@ -32,7 +32,7 @@
 *
 ******************************************************************************
 */
-
+#ifdef STM32F407xx
 /* Includes ------------------------------------------------------------------*/
 #include "bsp_sd.h"
 #include "interrupt.h"
@@ -84,13 +84,13 @@
 #define SD_BUS_WIDE_8B           SDIO_BUS_WIDE_8B
 #define SD_HW_FLOW_CTRL_ENABLE   SDIO_HARDWARE_FLOW_CONTROL_ENABLE
 #define SD_HW_FLOW_CTRL_DISABLE  SDIO_HARDWARE_FLOW_CONTROL_DISABLE
-#define SD_CLK_DIV               SDIO_TRANSFER_CLK_DIV
+#define SD_CLK_DIV               ((uint8_t)0x02) //SDIO_TRANSFER_CLK_DIV
 #else
 #error "Unknown SD_INSTANCE"
 #endif
 
 #ifndef SD_HW_FLOW_CTRL
-#define SD_HW_FLOW_CTRL          SD_HW_FLOW_CTRL_DISABLE
+#define SD_HW_FLOW_CTRL          SD_HW_FLOW_CTRL_ENABLE
 #endif
 
 #ifndef SD_BUS_WIDE
@@ -105,6 +105,8 @@
 static SD_HandleTypeDef uSdHandle;
 static uint32_t SD_detect_ll_gpio_pin = LL_GPIO_PIN_ALL;
 static GPIO_TypeDef *SD_detect_gpio_port = GPIOA;
+static DMA_HandleTypeDef hdma_tx;
+
 #ifdef SDMMC_TRANSCEIVER_ENABLE
 static uint32_t SD_trans_en_ll_gpio_pin = LL_GPIO_PIN_ALL;
 static GPIO_TypeDef *SD_trans_en_gpio_port = GPIOA;
@@ -602,7 +604,7 @@ uint8_t BSP_SD_WriteBlocks_DMA(uint32_t* pData,
   do
   {
     loopnr++;
-  } while ((loopnr <100000));
+  } while ((loopnr <1000000));
   // busy waiting
   do
   {
@@ -610,7 +612,7 @@ uint8_t BSP_SD_WriteBlocks_DMA(uint32_t* pData,
     loopnr--;
   } while ((HAL_SD_CARD_TRANSFER != card_state));
   return MSD_OK;
-   return (sd_state_while_loop == HAL_OK) ? MSD_OK : MSD_ERROR;
+  //  return (sd_state_while_loop == HAL_OK) ? MSD_OK : MSD_ERROR;
  }
 
 //  /**
@@ -659,7 +661,6 @@ uint8_t BSP_SD_WriteBlocks_DMA(uint32_t* pData,
  */
 static HAL_StatusTypeDef SD_DMAConfigTx(SD_HandleTypeDef* hsd)
 {
-    static DMA_HandleTypeDef hdma_tx;
     HAL_StatusTypeDef        status;
 
     /* Configure DMA Tx parameters */
@@ -671,7 +672,7 @@ static HAL_StatusTypeDef SD_DMAConfigTx(SD_HandleTypeDef* hsd)
     hdma_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
     hdma_tx.Init.MemDataAlignment    = DMA_MDATAALIGN_WORD;
     hdma_tx.Init.Priority            = DMA_PRIORITY_VERY_HIGH;
-    // hdma_tx.Init.Mode                = DMA_PFCTRL;
+    hdma_tx.Init.Mode                = DMA_PFCTRL;
     hdma_tx.Init.FIFOMode            = DMA_FIFOMODE_ENABLE;
     hdma_tx.Init.FIFOThreshold       = DMA_FIFO_THRESHOLD_FULL;
     hdma_tx.Init.MemBurst            = DMA_MBURST_INC4;
@@ -693,9 +694,59 @@ static HAL_StatusTypeDef SD_DMAConfigTx(SD_HandleTypeDef* hsd)
     status = HAL_DMA_Init(&hdma_tx);
 
     /* NVIC configuration for DMA transfer complete interrupt */
-    HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 1, 0);
+    HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
 
     return status;
 }
+
+/******************************************************************************/
+/* STM32F7xx Peripheral Interrupt Handlers                                    */
+/* Add here the Interrupt Handlers for the used peripherals.                  */
+/* For the available peripheral interrupt handler names,                      */
+/* please refer to the startup file (startup_stm32f7xx.s).                    */
+/******************************************************************************/
+
+/**
+* @brief This function handles DMA2 stream0 global interrupt.
+*/
+void DMA2_Stream3_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA2_Stream0_IRQn 0 */
+
+  /* USER CODE END DMA2_Stream0_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_tx);
+  /* USER CODE BEGIN DMA2_Stream0_IRQn 1 */
+
+  /* USER CODE END DMA2_Stream0_IRQn 1 */
+}
+
+// /**
+// * @brief This function handles DMA2 stream5 global interrupt.
+// */
+// void DMA2_Stream5_IRQHandler(void)
+// {
+//   /* USER CODE BEGIN DMA2_Stream5_IRQn 0 */
+
+//   /* USER CODE END DMA2_Stream5_IRQn 0 */
+//   HAL_DMA_IRQHandler(&hdma_rx);
+//   /* USER CODE BEGIN DMA2_Stream5_IRQn 1 */
+
+//   /* USER CODE END DMA2_Stream5_IRQn 1 */
+// }
+
+/**
+* @brief This function handles SDMMC2 global interrupt.
+*/
+void SDIO_IRQHandler(void)
+{
+  /* USER CODE BEGIN SDMMC2_IRQn 0 */
+
+  /* USER CODE END SDMMC2_IRQn 0 */
+  HAL_SD_IRQHandler(&uSdHandle);
+  /* USER CODE BEGIN SDMMC2_IRQn 1 */
+
+  /* USER CODE END SDMMC2_IRQn 1 */
+}
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+#endif
